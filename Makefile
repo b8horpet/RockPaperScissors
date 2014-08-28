@@ -1,6 +1,6 @@
 .PHONY: all
 all:
-	mkdir output
+	mkdir -p output
 	g++ rps.cpp -o output/rps.out -lncurses
 
 .PHONY: clean
