@@ -3,7 +3,7 @@
 //#include <readline/readline.h>
 #include <ncurses.h>
 
-//#include <boost/asio.hpp>
+#include <boost/asio.hpp>
 //#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/version.hpp>
 
