@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <string>
 //#include <readline/readline.h>
 #if defined linux
 #include <ncurses.h>
@@ -11,8 +12,9 @@
 //what? O_o
 #endif
 
+#include <boost/array.hpp>
 #include <boost/asio.hpp>
-//#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/version.hpp>
 
 #ifdef WIN32
@@ -25,6 +27,19 @@ unsigned sleep(unsigned seconds)
 
 int main(int argc, char** argv)
 {
+	bool ShouldTryConnection=false;
+	if(argc < 2)
+	{
+		fprintf(stderr,"Usage %s <host> [port]",argv[0]);
+		return 1;
+	}
+	std::string host(argv[1]);
+	std::string port;
+	if(argc>2)
+	{
+		ShouldTryConnection=true;
+		port=argv[2];
+	}
 #if defined linux || defined WIN32
 	initscr();
 	cbreak();
@@ -33,6 +48,42 @@ int main(int argc, char** argv)
 	printw("Rock Paper Scissors Game\n");
 	printw("Built with Boost v %d.%02d.%02d\n",BOOST_VERSION/100000,(BOOST_VERSION/100)%100,BOOST_VERSION%100);
 	refresh();
+	printw("Press any key to start");
+	refresh();
+	getch();
+	printw("\nStarting TCP stuff\n");
+	refresh();
+	/// Do the thing
+
+try{
+	boost::asio::io_service io_service;
+	boost::asio::ip::tcp::resolver resolver(io_service);
+	printw("Querying host\n");
+	refresh();
+	boost::asio::ip::tcp::resolver::query query(host,port);
+	printw("Resolving host\n");
+	refresh();
+	boost::asio::ip::tcp::resolver::iterator it = resolver.resolve(query);
+	boost::asio::ip::tcp::socket socket(io_service);
+	if(ShouldTryConnection)
+	{
+		printw("Connecting socket\n");
+		refresh();
+		boost::asio::connect(socket, it);
+	}
+	printw("Done. Press any key\n");
+	refresh();
+} catch(std::exception e)
+{
+	printw("ERRROR: %s!\n",e.what());
+	printw("Press any key\n");
+	refresh();
+	getch();
+	endwin();
+	return 1;
+}
+
+	/// Thing done, exiting
 	getch();
 	printw("Exiting ");
 	refresh();
