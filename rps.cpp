@@ -25,12 +25,40 @@ unsigned sleep(unsigned seconds)
 }
 #endif
 
+#if (BOOST_VERSION/100)%100 < 48
+namespace boost
+{
+	namespace asio
+	{
+		template<
+			typename Protocol,
+			typename SocketService,
+			typename Iterator>
+		Iterator connect(
+			basic_socket< Protocol, SocketService > & s,
+			Iterator begin)
+		{
+			boost::system::error_code error = boost::asio::error::host_not_found;
+			boost::asio::ip::tcp::resolver::iterator end;
+			while (error && begin != end)
+			{
+				s.close();
+				s.connect(*begin++, error);
+			}
+			if (error)
+				throw boost::system::system_error(error);
+			return begin;
+		}
+	}
+}
+#endif
+
 int main(int argc, char** argv)
 {
 	bool ShouldTryConnection=false;
 	if(argc < 2)
 	{
-		fprintf(stderr,"Usage %s <host> [port]",argv[0]);
+		fprintf(stderr,"Usage %s <host> [port]\n",argv[0]);
 		return 1;
 	}
 	std::string host(argv[1]);
