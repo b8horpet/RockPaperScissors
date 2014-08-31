@@ -1,17 +1,31 @@
 #include <stdio.h>
 #include <unistd.h>
 //#include <readline/readline.h>
-#ifdef linux
+#if defined linux
 #include <ncurses.h>
+#elif defined WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <curses.h>
+#else
+//what? O_o
 #endif
 
 #include <boost/asio.hpp>
 //#include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/version.hpp>
 
+#ifdef WIN32
+unsigned sleep(unsigned seconds)
+{
+	Sleep(seconds*1000);
+	return 0;
+}
+#endif
+
 int main(int argc, char** argv)
 {
-#if defined linux
+#if defined linux || defined WIN32
 	initscr();
 	cbreak();
 	keypad(stdscr, TRUE);
@@ -32,8 +46,8 @@ int main(int argc, char** argv)
 	printw("\n");
 	refresh();
 	endwin();
-#elif defined WIN32
-	printf("You should probably use linux.\n");
+/*#elif defined WIN32
+	printf("You should probably use linux.\n");*/
 #else
 	fprintf(stderr,"What is this platform even?\n");
 #endif
