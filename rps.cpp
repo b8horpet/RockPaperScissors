@@ -2,15 +2,11 @@
 #include <unistd.h>
 #include <string>
 //#include <readline/readline.h>
-#if defined linux
-#include <ncurses.h>
-#elif defined WIN32
+#if defined WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <curses.h>
-#else
-//what? O_o
 #endif
+#include <curses.h>
 
 #include <boost/array.hpp>
 #include <boost/asio.hpp>
