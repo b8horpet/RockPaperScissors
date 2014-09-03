@@ -49,6 +49,17 @@ namespace boost
 				throw boost::system::system_error(error);
 			return begin;
 		}
+
+		template<
+			typename SyncWriteStream,
+			typename ConstBufferSequence>
+		std::size_t write(
+			SyncWriteStream & s,
+			const ConstBufferSequence & buffers,
+			boost::system::error_code & ec)
+		{
+			return write(s,buffers,boost::asio::transfer_all(),ec);
+		}
 	}
 }
 #endif
@@ -62,6 +73,199 @@ enum ConnectionMode
 };
 
 int g_Mode = Unknown;
+
+enum RockPaperScissors
+{
+	None = 0,
+	Rock,
+	Paper,
+	Scissors,
+};
+
+class Step
+{
+//TODO: should be threadsafe
+// some kind of locking or atomic?
+	RockPaperScissors Value;
+public:
+	Step():Value(None){}
+	void Set(RockPaperScissors s)
+	{
+		//lock
+		Value=s;
+		//unlock
+	}
+	RockPaperScissors Get()
+	{
+		//lock
+		RockPaperScissors retval=Value;
+		//unlock
+	}
+	void Clear()
+	{
+		//lock
+		Value=None;
+		//release
+	}
+};
+
+enum WhatNow
+{
+	Init=-1,
+	PickStep=0,
+	SendStep,
+	GetKey,
+	UnlockStep,
+	MatchResults,
+	NewRound,
+};
+
+class GameState
+{
+public:
+	std::vector<Step> History;
+	WhatNow StateMachine;
+	long wins,loses,draws;
+	bool WantMoreRounds;
+	//TODO
+};
+
+class GameLogic
+{
+	GameState State;
+	Step BestStep;
+	std::string SentKey,ReceivedKey;
+	std::string SentStep,ReceivedStep;
+	//vmi lock
+	//vmi Communicator
+public:
+	void NextState()
+	{
+		//lock
+		//state changed event?
+		switch(State.StateMachine)
+		{
+		case Init:
+			{
+				//...
+				State.StateMachine=PickStep;
+			}
+			break;
+		case PickStep:
+			{
+				BestStep.Clear();
+				//start picking
+				State.StateMachine=SendStep;
+			}
+			break;
+		case SendStep:
+			{
+				SentStep=PickBestStep();
+				//Communicator.Send(EncodeStep());
+				State.StateMachine=GetKey;
+			}
+			break;
+		case GetKey:
+			{
+				//ReceivedStep=Communicator.Get();
+				//StoreKey(Communicator.Get());
+				State.StateMachine=UnlockStep;
+			}
+			break;
+		case UnlockStep:
+			{
+				ReceivedStep=DecodeStep();
+				State.StateMachine=MatchResults;
+			}
+			break;
+		case MatchResults:
+			{
+				DidIWin();
+				if(State.WantMoreRounds)
+					State.StateMachine=PickStep;
+				else
+					exit(0);
+			}
+			break;
+		default:
+			assert(false);
+		}
+		//unlock
+	}
+	void DidIWin()
+	{
+		RockPaperScissors mine=StringToStep(SentStep);
+		RockPaperScissors other=StringToStep(ReceivedStep);
+		assert(mine&&other);
+		if(mine==other)
+			++State.draws;
+		if((mine-other+3)%3==1)
+			++State.wins;
+		else
+			++State.loses;
+		//GameState.SaveRound;
+	}
+	std::string PickBestStep()
+	{
+		return StepToString(BestStep.Get());
+	}
+	std::string DecodeStep()
+	{
+		//use the key;
+		return ReceivedStep;
+	}
+
+	void PickKey()
+	{
+		SentKey="";
+	}
+	void StoreKey(std::string k)
+	{
+		assert(k.empty());
+		ReceivedKey=k;
+	}
+
+	std::string EncodeStep()
+	{
+		//majd
+		PickKey();
+		return SentStep;
+	}
+	std::string StepToString(RockPaperScissors rps)
+	{
+		switch(rps)
+		{
+			case Rock:
+				return "r";
+			case Paper:
+				return "p";
+			case Scissors:
+				return "s";
+			default:
+				return "";
+		}
+		return "";
+	}
+	RockPaperScissors StringToStep(std::string s)
+	{
+		if(s.empty())
+			return None;
+		if(s[1]!=0)
+			return None;
+		switch(s[0])
+		{
+		case 'r':
+			return Rock;
+		case 'p':
+			return Paper;
+		case 's':
+			return Scissors;
+		default:
+			return None;
+		}
+		return None;
+	}
+} g_GameLogic;
 
 int main(int argc, char** argv)
 {
@@ -110,13 +314,10 @@ int main(int argc, char** argv)
 
 	if(vm.count("port"))
 	{
-		/*std::cout << "ports:";
-		std::vector<std::string> myvec=vm["port"].as<std::vector<std::string> >();
-		for(std::vector<std::string>::iterator i=myvec.begin(); i!=myvec.end(); ++i)
-		{
-			std::cout << " " << *i;
-		}
-		std::cout << "\n";*/
+		ShouldTryConnection=true;
+		std::vector<std::string> ports=vm["port"].as<std::vector<std::string> >();
+		if(!ports.empty())
+			port=ports.back();
 	}
 
 	if(vm.count("host"))
