@@ -14,6 +14,7 @@
 
 #include <iostream> // this dependency should be removed, only needed for program_options
 #include <boost/program_options.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <boost/version.hpp>
 
@@ -63,6 +64,16 @@ namespace boost
 	}
 }
 #endif
+
+class my_exception : public std::exception
+{
+public:
+	const char* const message;
+	explicit my_exception() : message("lofasz") {}
+	explicit my_exception(const char * m) : message(m) {}
+	virtual ~my_exception() throw() {}
+	virtual const char* what() const throw() { return message; }
+};
 
 enum ConnectionMode
 {
@@ -361,6 +372,8 @@ int main(int argc, char** argv)
 	printw("\nStarting TCP stuff\n");
 	refresh();
 	/// Do the thing
+	char buf[4096];
+	memset(buf,0,4096);
 
 try{
 	boost::asio::io_service io_service;
@@ -370,19 +383,45 @@ try{
 	boost::asio::ip::tcp::resolver::query query(host,port);
 	printw("Resolving host\n");
 	refresh();
-	boost::asio::ip::tcp::resolver::iterator it = resolver.resolve(query);
 	boost::asio::ip::tcp::socket socket(io_service);
 	if(ShouldTryConnection)
 	{
 		printw("Connecting socket\n");
 		refresh();
-		boost::asio::connect(socket, it);
+		switch(g_Mode)
+		{
+		case Client:
+			{
+			boost::asio::ip::tcp::resolver::iterator it = resolver.resolve(query);
+			boost::asio::connect(socket, it);
+			}
+			break;
+		case Server:
+			{
+			boost::asio::ip::tcp::acceptor acceptor(io_service,boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(),boost::lexical_cast<int>(port)));
+			acceptor.accept(socket);
+			}
+			break;
+		case Hybrid:
+			throw my_exception("not implemented yet");
+			break;
+		case Unknown:
+		default:
+			throw my_exception("unknown mode");
+			break;
+		}
+		socket.read_some(boost::asio::buffer(buf,4096));
+		printw("read: %s\n",buf);
+		memset(buf,0,4096);
+		strcpy(buf,"Allah Akbar!");
+		printw("sending %s\n",buf);
+		socket.write_some(boost::asio::buffer(buf,strlen(buf)));
 	}
 	printw("Done. Press any key\n");
 	refresh();
-} catch(std::exception e)
+} catch(std::exception& e)
 {
-	printw("ERRROR: %s!\n",e.what());
+	printw("ERROR: %s!\n",e.what());
 	printw("Press any key\n");
 	refresh();
 	getch();
