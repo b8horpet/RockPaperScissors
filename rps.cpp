@@ -294,7 +294,14 @@ int main(int argc, char** argv)
 	;
 
 	boost::program_options::variables_map vm;
+	try{
 	boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
+	}
+	catch(std::exception& e)
+	{
+		std::cout << "ERROR: " << e.what() << "!\n";
+		return 1;
+	}
 	boost::program_options::notify(vm);
 
 	if(vm.count("help"))
