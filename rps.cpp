@@ -291,6 +291,7 @@ int main(int argc, char** argv)
 	("host,h", boost::program_options::value<std::string>(&host), "set communication host")
 	("server", "server mode")
 	("client", "client mode")
+	("version,v", "print version info and exit")
 	;
 
 	boost::program_options::variables_map vm;
@@ -307,6 +308,12 @@ int main(int argc, char** argv)
 	if(vm.count("help"))
 	{
 		std::cout << desc << "\n";
+		return 0;
+	}
+
+	if(vm.count("version"))
+	{
+		std::cout << "Rock Paper Scissors Game\n" << "Built with Boost v" << BOOST_VERSION/100000 << "." << std::setfill('0') << std::setw(2) << (BOOST_VERSION/100)%100 << "." << std::setfill('0') << std::setw(2) << BOOST_VERSION%100 << "\n";
 		return 0;
 	}
 
