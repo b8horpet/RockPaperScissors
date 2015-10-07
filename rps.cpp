@@ -424,12 +424,38 @@ try{
 			throw my_exception("unknown mode");
 			break;
 		}
-		socket.read_some(boost::asio::buffer(buf,4096));
-		printw("read: %s\n",buf);
-		memset(buf,0,4096);
-		strcpy(buf,"Allah Akbar!");
-		printw("sending %s\n",buf);
-		socket.write_some(boost::asio::buffer(buf,strlen(buf)));
+		// temporary workaround
+		// only serves testing purposes
+		if(g_Mode==Server)
+		{
+			printw("tryna read sum\n");
+			refresh();
+			socket.read_some(boost::asio::buffer(buf,4096));
+			printw("read: %s\n",buf);
+			refresh();
+			memset(buf,0,4096);
+			strcpy(buf,"Allah Akbar!");
+			printw("sending %s\n",buf);
+			refresh();
+			socket.write_some(boost::asio::buffer(buf,strlen(buf)));
+			printw("message sent\n");
+			refresh();
+		}
+		else
+		{
+			memset(buf,0,4096);
+			strcpy(buf,"Allah Akbar!");
+			printw("sending %s\n",buf);
+			refresh();
+			socket.write_some(boost::asio::buffer(buf,strlen(buf)));
+			printw("message sent\n");
+			refresh();
+			printw("tryna read sum\n");
+			refresh();
+			socket.read_some(boost::asio::buffer(buf,4096));
+			printw("read: %s\n",buf);
+			refresh();
+		}
 	}
 	printw("Done. Press any key\n");
 	refresh();
