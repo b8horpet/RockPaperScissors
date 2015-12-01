@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <time.h>
 #include <string>
 #include <vector>
 #if defined WIN32
@@ -370,6 +372,7 @@ int main(int argc, char** argv)
 {
 	ParseCommandLineOptions(argc,argv);
 	InitWindow();
+	srand(time(NULL));
 	/// Do the thing
 	char buf[4096]={0};
 
@@ -415,30 +418,51 @@ int main(int argc, char** argv)
 			{
 				if(g_Mode==Server)
 				{
-					printw("tryna read sum\n");
-					refresh();
+					memset(buf,0,4096);
 					socket.read_some(boost::asio::buffer(buf,4096));
 					printw("read: %s\n",buf);
 					refresh();
 					memset(buf,0,4096);
-					strcpy(buf,"Allah Akbar!");
-					printw("sending %s\n",buf);
+					switch(rand()%3)
+					{
+					case 0:
+						strcpy(buf,"r");
+						break;
+					case 1:
+						strcpy(buf,"p");
+						break;
+					case 2:
+						strcpy(buf,"s");
+						break;
+					default:
+						throw my_exception("wtf?");
+						break;
+					}
+					printw("send: %s\n",buf);
 					refresh();
 					socket.write_some(boost::asio::buffer(buf,strlen(buf)));
-					printw("message sent\n");
-					refresh();
 				}
 				else
 				{
 					memset(buf,0,4096);
-					strcpy(buf,"Allah Akbar!");
-					printw("sending %s\n",buf);
+					switch(rand()%3)
+					{
+					case 0:
+						strcpy(buf,"r");
+						break;
+					case 1:
+						strcpy(buf,"p");
+						break;
+					case 2:
+						strcpy(buf,"s");
+						break;
+					default:
+						throw my_exception("wtf?");
+						break;
+					}
+					printw("send: %s\n",buf);
 					refresh();
 					socket.write_some(boost::asio::buffer(buf,strlen(buf)));
-					printw("message sent\n");
-					refresh();
-					printw("tryna read sum\n");
-					refresh();
 					socket.read_some(boost::asio::buffer(buf,4096));
 					printw("read: %s\n",buf);
 					refresh();
