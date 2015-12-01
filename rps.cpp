@@ -68,11 +68,11 @@ namespace boost
 class my_exception : public std::exception
 {
 public:
-	const char* const message;
+	const char * const message;
 	explicit my_exception() : message("lofasz") {}
-	explicit my_exception(const char * m) : message(m) {}
+	explicit my_exception(const char * const m) : message(m) {}
 	virtual ~my_exception() throw() {}
-	virtual const char* what() const throw() { return message; }
+	virtual const char * what() const throw() { return message; }
 };
 
 enum ConnectionMode
@@ -278,43 +278,44 @@ public:
 	}
 } g_GameLogic;
 
-int main(int argc, char** argv)
-{
-	bool ShouldTryConnection=false;
-	std::string host;
-	std::string port;
+bool gShouldTryConnection=false;
+std::string gHost;
+std::string gPort;
 
+void ParseCommandLineOptions(int argc, char** argv)
+{
 	boost::program_options::options_description desc("Allowed options");
 	desc.add_options()
 	("help,?", "produce help message")
 	("port,p", boost::program_options::value<std::vector<std::string> >(), "set communication port")
-	("host,h", boost::program_options::value<std::string>(&host), "set communication host")
+	("host,h", boost::program_options::value<std::string>(&gHost), "set communication host")
 	("server", "server mode")
 	("client", "client mode")
 	("version,v", "print version info and exit")
 	;
 
 	boost::program_options::variables_map vm;
-	try{
-	boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
+	try
+	{
+		boost::program_options::store(boost::program_options::parse_command_line(argc, argv, desc), vm);
 	}
 	catch(std::exception& e)
 	{
 		std::cout << "ERROR: " << e.what() << "!\n";
-		return 1;
+		exit(1);
 	}
 	boost::program_options::notify(vm);
 
 	if(vm.count("help"))
 	{
 		std::cout << desc << "\n";
-		return 0;
+		exit(0);
 	}
 
 	if(vm.count("version"))
 	{
 		std::cout << "Rock Paper Scissors Game\n" << "Built with Boost v" << BOOST_VERSION/100000 << "." << std::setfill('0') << std::setw(2) << (BOOST_VERSION/100)%100 << "." << std::setfill('0') << std::setw(2) << BOOST_VERSION%100 << "\n";
-		return 0;
+		exit(0);
 	}
 
 	if(vm.count("server"))
@@ -329,158 +330,137 @@ int main(int argc, char** argv)
 	if(g_Mode == Unknown)
 	{
 		std::cerr << desc << "\n" << "Either --server or --client should be used.\n";
-		return 1;
+		exit(1);
 	}
 	if(g_Mode == Hybrid)
 	{
 		std::cerr << desc << "\n" << "Only one of the following options should be used: --server --client\n" << "Hybrid mode is not supported yet.\n";
-		return 1;
+		exit(1);
 	}
 
 	if(vm.count("port"))
 	{
-		ShouldTryConnection=true;
+		gShouldTryConnection=true;
 		std::vector<std::string> ports=vm["port"].as<std::vector<std::string> >();
 		if(!ports.empty())
-			port=ports.back();
+			gPort=ports.back();
 	}
 
-	if(vm.count("host"))
-	{
-		//std::cout << "host: " << vm["host"].as<std::string>() << "\n";
-	}
-	else
+	if(!vm.count("host"))
 	{
 		std::cerr << desc << "\n";
-		return 1;
+		exit(1);
 	}
+}
 
-/*
-	// Backup
-	if(argc < 2)
-	{
-		fprintf(stderr,"Usage %s <host> [port]\n",argv[0]);
-		return 1;
-	}
-	std::string host(argv[1]);
-	std::string port;
-	if(argc>2)
-	{
-		ShouldTryConnection=true;
-		port=argv[2];
-	}
-*/
-
-
-
+void InitWindow()
+{
 	initscr();
 	cbreak();
 	keypad(stdscr, TRUE);
+	scrollok(stdscr,TRUE);
 	noecho();
 	printw("Rock Paper Scissors Game\n");
 	printw("Built with Boost v %d.%02d.%02d\n",BOOST_VERSION/100000,(BOOST_VERSION/100)%100,BOOST_VERSION%100);
-	refresh();
-	printw("Press any key to start");
-	refresh();
-	getch();
 	printw("\nStarting TCP stuff\n");
 	refresh();
-	/// Do the thing
-	char buf[4096];
-	memset(buf,0,4096);
-
-try{
-	boost::asio::io_service io_service;
-	boost::asio::ip::tcp::resolver resolver(io_service);
-	printw("Querying host\n");
-	refresh();
-	boost::asio::ip::tcp::resolver::query query(host,port);
-	printw("Resolving host\n");
-	refresh();
-	boost::asio::ip::tcp::socket socket(io_service);
-	if(ShouldTryConnection)
-	{
-		printw("Connecting socket\n");
-		refresh();
-		switch(g_Mode)
-		{
-		case Client:
-			{
-			boost::asio::ip::tcp::resolver::iterator it = resolver.resolve(query);
-			boost::asio::connect(socket, it);
-			}
-			break;
-		case Server:
-			{
-			boost::asio::ip::tcp::acceptor acceptor(io_service,boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(),boost::lexical_cast<int>(port)));
-			acceptor.accept(socket);
-			}
-			break;
-		case Hybrid:
-			throw my_exception("not implemented yet");
-			break;
-		case Unknown:
-		default:
-			throw my_exception("unknown mode");
-			break;
-		}
-		// temporary workaround
-		// only serves testing purposes
-		if(g_Mode==Server)
-		{
-			printw("tryna read sum\n");
-			refresh();
-			socket.read_some(boost::asio::buffer(buf,4096));
-			printw("read: %s\n",buf);
-			refresh();
-			memset(buf,0,4096);
-			strcpy(buf,"Allah Akbar!");
-			printw("sending %s\n",buf);
-			refresh();
-			socket.write_some(boost::asio::buffer(buf,strlen(buf)));
-			printw("message sent\n");
-			refresh();
-		}
-		else
-		{
-			memset(buf,0,4096);
-			strcpy(buf,"Allah Akbar!");
-			printw("sending %s\n",buf);
-			refresh();
-			socket.write_some(boost::asio::buffer(buf,strlen(buf)));
-			printw("message sent\n");
-			refresh();
-			printw("tryna read sum\n");
-			refresh();
-			socket.read_some(boost::asio::buffer(buf,4096));
-			printw("read: %s\n",buf);
-			refresh();
-		}
-	}
-	printw("Done. Press any key\n");
-	refresh();
-} catch(std::exception& e)
-{
-	printw("ERROR: %s!\n",e.what());
-	printw("Press any key\n");
-	refresh();
-	getch();
-	endwin();
-	return 1;
 }
+
+int main(int argc, char** argv)
+{
+	ParseCommandLineOptions(argc,argv);
+	InitWindow();
+	/// Do the thing
+	char buf[4096]={0};
+
+	try
+	{
+		boost::asio::io_service io_service;
+		boost::asio::ip::tcp::resolver resolver(io_service);
+		printw("Querying host\n");
+		refresh();
+		boost::asio::ip::tcp::resolver::query query(gHost,gPort);
+		printw("Resolving host\n");
+		refresh();
+		boost::asio::ip::tcp::socket socket(io_service);
+		if(gShouldTryConnection)
+		{
+			printw("Connecting socket\n");
+			refresh();
+			switch(g_Mode)
+			{
+			case Client:
+				{
+				boost::asio::ip::tcp::resolver::iterator it = resolver.resolve(query);
+				boost::asio::connect(socket, it);
+				}
+				break;
+			case Server:
+				{
+				boost::asio::ip::tcp::acceptor acceptor(io_service,boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(),boost::lexical_cast<int>(gPort)));
+				acceptor.accept(socket);
+				}
+				break;
+			case Hybrid:
+				throw my_exception("not implemented yet");
+				break;
+			case Unknown:
+			default:
+				throw my_exception("unknown mode");
+				break;
+			}
+			// temporary workaround
+			// only serves testing purposes
+			while(true)
+			{
+				if(g_Mode==Server)
+				{
+					printw("tryna read sum\n");
+					refresh();
+					socket.read_some(boost::asio::buffer(buf,4096));
+					printw("read: %s\n",buf);
+					refresh();
+					memset(buf,0,4096);
+					strcpy(buf,"Allah Akbar!");
+					printw("sending %s\n",buf);
+					refresh();
+					socket.write_some(boost::asio::buffer(buf,strlen(buf)));
+					printw("message sent\n");
+					refresh();
+				}
+				else
+				{
+					memset(buf,0,4096);
+					strcpy(buf,"Allah Akbar!");
+					printw("sending %s\n",buf);
+					refresh();
+					socket.write_some(boost::asio::buffer(buf,strlen(buf)));
+					printw("message sent\n");
+					refresh();
+					printw("tryna read sum\n");
+					refresh();
+					socket.read_some(boost::asio::buffer(buf,4096));
+					printw("read: %s\n",buf);
+					refresh();
+				}
+			}
+		}
+		printw("Done. Press any key\n");
+		refresh();
+	}
+	catch(std::exception& e)
+	{
+		printw("ERROR: %s!\n",e.what());
+		printw("Press any key\n");
+		refresh();
+		getch();
+		endwin();
+		return 1;
+	}
 
 	/// Thing done, exiting
 	getch();
-	printw("Exiting ");
-	refresh();
-	for(int i=0; i<3; ++i)
-	{
-		sleep(1);
-		printw(".");
-		refresh();
-	}
-	sleep(1);
-	printw("\n");
+	printw("Exiting\n");
 	refresh();
 	endwin();
 	return 0;
