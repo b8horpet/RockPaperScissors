@@ -20,6 +20,8 @@
 
 #include <boost/version.hpp>
 
+#include "MD5.hxx"
+
 #ifdef WIN32
 unsigned sleep(unsigned seconds)
 {
@@ -27,6 +29,8 @@ unsigned sleep(unsigned seconds)
 	return 0;
 }
 #endif
+
+using namespace rps::crypto::md5;
 
 #if (BOOST_VERSION/100)%100 < 48
 namespace boost
@@ -357,16 +361,19 @@ void ParseCommandLineOptions(int argc, char** argv)
 
 void InitWindow()
 {
-	initscr();
+/*	initscr();
 	cbreak();
 	keypad(stdscr, TRUE);
 	scrollok(stdscr,TRUE);
-	noecho();
+	noecho();*/
+#define printw printf
 	printw("Rock Paper Scissors Game\n");
 	printw("Built with Boost v %d.%02d.%02d\n",BOOST_VERSION/100000,(BOOST_VERSION/100)%100,BOOST_VERSION%100);
 	printw("\nStarting TCP stuff\n");
 	refresh();
 }
+
+char valid_chars[3]={'r','p','s'};
 
 int main(int argc, char** argv)
 {
@@ -416,31 +423,43 @@ int main(int argc, char** argv)
 			// only serves testing purposes
 			while(true)
 			{
+				char salt1=(rand()%255) +1;
+				char gothash[4096]={0};
 				if(g_Mode==Server)
 				{
-					memset(buf,0,4096);
-					socket.read_some(boost::asio::buffer(buf,4096));
-					printw("read: %s\n",buf);
+					socket.read_some(boost::asio::buffer(gothash,4096));
+					printw("read: ");
+					for(int hx=0; hx<16; ++hx)
+						printw("%02hhx",gothash[hx]);
+					printw("\n");
 					refresh();
 					memset(buf,0,4096);
 					switch(rand()%3)
 					{
 					case 0:
-						strcpy(buf,"r");
+						strcpy(buf+1,"r");
 						break;
 					case 1:
-						strcpy(buf,"p");
+						strcpy(buf+1,"p");
 						break;
 					case 2:
-						strcpy(buf,"s");
+						strcpy(buf+1,"s");
 						break;
 					default:
 						throw my_exception("wtf?");
 						break;
 					}
-					printw("send: %s\n",buf);
+					printw("send: %s\n",buf+1);
 					refresh();
-					socket.write_some(boost::asio::buffer(buf,strlen(buf)));
+					buf[0]=buf[2]=salt1;
+					digest d = generate(buf,3);
+					std::copy(d.begin(),d.end(),buf);
+					printw("send: ");
+					for(int hx=0; hx<strlen(buf); ++hx)
+						printw("%02hhx",buf[hx]);
+					printw("\n");
+					refresh();
+					socket.write_some(boost::asio::buffer(buf,16));
 				}
 				else
 				{
@@ -448,25 +467,77 @@ int main(int argc, char** argv)
 					switch(rand()%3)
 					{
 					case 0:
-						strcpy(buf,"r");
+						strcpy(buf+1,"r");
 						break;
 					case 1:
-						strcpy(buf,"p");
+						strcpy(buf+1,"p");
 						break;
 					case 2:
-						strcpy(buf,"s");
+						strcpy(buf+1,"s");
 						break;
 					default:
 						throw my_exception("wtf?");
 						break;
 					}
-					printw("send: %s\n",buf);
+					printw("send: %s\n",buf+1);
 					refresh();
-					socket.write_some(boost::asio::buffer(buf,strlen(buf)));
-					socket.read_some(boost::asio::buffer(buf,4096));
-					printw("read: %s\n",buf);
+					buf[0]=buf[2]=salt1;
+					digest d = generate(buf,3);
+					std::copy(d.begin(),d.end(),buf);
+					printw("send: ");
+					for(int hx=0; hx<strlen(buf); ++hx)
+						printw("%02hhx",buf[hx]);
+					printw("\n");
+					refresh();
+					socket.write_some(boost::asio::buffer(buf,16));
+					socket.read_some(boost::asio::buffer(gothash,4096));
+					printw("read: ");
+					for(int hx=0; hx<16; ++hx)
+						printw("%02hhx",gothash[hx]);
+					printw("\n");
 					refresh();
 				}
+				char salt2[4096]={0};
+				if(g_Mode==Server)
+				{
+					socket.read_some(boost::asio::buffer(salt2,4096));
+					memset(buf,0,4096);
+					buf[0]=salt1;
+					socket.write_some(boost::asio::buffer(buf,1));
+				}
+				else
+				{
+					memset(buf,0,4096);
+					buf[0]=salt1;
+					socket.write_some(boost::asio::buffer(buf,1));
+					socket.read_some(boost::asio::buffer(salt2,4096));
+				}
+				bool successfullyunhashed=false;
+				for(int i=0; i<3; ++i)
+				{
+					char p=valid_chars[i];
+					memset(buf,0,4096);
+					memcpy(buf+strlen(buf),salt2,strlen(salt2));
+					buf[strlen(buf)]=p;
+					memcpy(buf+strlen(buf),salt2,strlen(salt2));
+					digest d=generate(buf,strlen(buf));
+					std::copy(d.begin(),d.end(),buf);
+					if(strcmp(buf,gothash)==0)
+					{
+						printw("read: %c\n",p);
+						refresh();
+						successfullyunhashed=true;
+						break;
+					}
+				}
+				if(!successfullyunhashed)
+				{
+					printw("cannot unpack, terminating\n");
+					refresh();
+					break;
+				}
+				printw("--- *** ---\n");
+				//usleep(1000);
 			}
 		}
 		printw("Done. Press any key\n");
@@ -486,6 +557,6 @@ int main(int argc, char** argv)
 	getch();
 	printw("Exiting\n");
 	refresh();
-	endwin();
+//	endwin();
 	return 0;
 }
